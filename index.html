@@ -2,109 +2,444 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Santa Tracker Philippines 🎅🇵🇭</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Santa Tracker PH – Viral Phone Edition 🎅📱</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #0b1d3a;
-      color: #fff;
-    }
-    header {
-      padding: 16px;
-      text-align: center;
-      background: linear-gradient(135deg, #c1121f, #780000);
-    }
-    header h1 {
-      margin: 0;
-      font-size: 1.5rem;
-    }
-    header p {
-      margin: 6px 0 0;
-      font-size: 0.95rem;
-      opacity: 0.9;
-    }
-    #map {
-      height: calc(100vh - 120px);
-      width: 100%;
-    }
-    footer {
-      padding: 10px;
-      text-align: center;
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: radial-gradient(circle at top, #0e2a47 0%, #061327 65%); color: #fff; overflow-x: hidden; }
+    header { padding: 8px 10px; text-align: center; background: linear-gradient(135deg, #b1121f, #6b0000); }
+    header h1 { margin: 0; font-size: 1.05rem; line-height: 1.2; }
+    header p { margin: 2px 0 0; font-size: 0.75rem; opacity: 0.95; }
+    #map { height: 50vh; width: 100%; }
+    .panel { padding: 10px; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card { background: rgba(255,255,255,0.09); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); backdrop-filter: blur(6px); }
+    .card h3 { margin: 0 0 6px; font-size: 0.9rem; }
+    button, .link-btn { padding: 10px 12px; border-radius: 12px; border: none; cursor: pointer; background: #198754; color: #fff; font-weight: 700; font-size: 0.8rem; width: 100%; }
+    .secondary { background: #0d6efd; } .warn { background: #ffc107; color: #000; } .danger { background: #dc3545; }
+    footer { padding: 8px; text-align: center; font-size: 0.7rem; background: #041022; }
+    .quote { font-style: italic; font-size: 0.8rem; }
+    .snowflake { position: fixed; top: -10px; color: white; font-size: 0.9em; animation: fall linear infinite; z-index: 9999; pointer-events: none; }
+    @keyframes fall { to { transform: translateY(110vh); } }
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #000; padding: 12px 16px; border-radius: 14px; box-shadow: 0 12px 24px rgba(0,0,0,0.45); display: none; z-index: 10000; font-size: 0.85rem; }
+    
+    /* Chatbox styles */
+    #chat-container {
+      position: fixed;
+      bottom: 0;
+      right: 10px;
+      width: 260px;
+      max-width: 90vw;
+      background: rgba(0,0,0,0.7);
+      padding: 8px;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
       font-size: 0.85rem;
-      background: #08162d;
-    }
-    .share {
-      display: inline-block;
-      margin-top: 6px;
-      padding: 6px 12px;
-      background: #198754;
       color: #fff;
-      border-radius: 6px;
-      cursor: pointer;
-      text-decoration: none;
+      z-index: 9999;
     }
+    #chat-messages {
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #fff2;
+      padding-bottom: 4px;
+    }
+    #chat-messages div { margin: 4px 0; }
+    #chat-input { width: calc(100% - 50px); padding: 6px 8px; border-radius: 8px; border: none; }
+    #chat-container button { width: 40px; padding: 6px; border-radius: 8px; border: none; background: #198754; color: #fff; cursor: pointer; font-weight: bold; }
+
+    @media (min-width: 768px) { #map { height: 52vh; } .panel { grid-template-columns: repeat(4, 1fr); } }
   </style>
 </head>
 <body>
   <header>
-    <h1>🎅 Santa Tracker – Philippines</h1>
-    <p>Just for fun! Watch Santa travel around the Philippines delivering gifts 🎁</p>
+    <h1>🎅 Santa Tracker PH</h1>
+    <p id="subtitle">Malapit na si Santa! 🎁</p>
+    <p style="margin:2px 0 0;font-size:0.65rem;opacity:0.85;">by Kenichi</p>
   </header>
 
   <div id="map"></div>
 
+  <section class="panel">
+    <div class="card">
+      <h3>🎁 Gift ETA</h3>
+      <p id="eta">--:--</p>
+      <button onclick="generateETA()">Refresh ETA</button>
+    </div>
+
+    <div class="card">
+      <h3>🌟 Good Kid</h3>
+      <p id="score">Score: 0</p>
+      <button class="secondary" onclick="addPoints()">Good Deed</button>
+    </div>
+
+    <div class="card">
+      <h3>💬 Santa Says</h3>
+      <p id="quote" class="quote"></p>
+      <button class="warn" onclick="newQuote()">New Message</button>
+    </div>
+
+    <div class="card">
+      <h3>🎶 Sounds</h3>
+      <button onclick="toggleMusic()">Music On/Off</button>
+      <div style="height:6px"></div>
+      <button class="secondary" onclick="hohoho()">Ho Ho Ho!</button>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <h3>🎮 FREE ROBUX 😱</h3>
+      <button class="danger" onclick="robuxPrank()">👉 Click here to claim</button>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <h3>⏳ Countdown</h3>
+      <p id="countdown"></p>
+    </div>
+  </section>
+
   <footer>
-    Share this tracker with friends 👇<br />
-    <span class="share" onclick="copyLink()">Copy Shareable Link</span>
+    Share the prank & the joy 🎄<br />
+    <button onclick="copyLink()">Copy Shareable Link</button>
   </footer>
+
+  <div class="toast" id="toast">Pabili ka sa mama mo! 😂🎁</div>
+
+  <!-- Santa Chat Box -->
+  <div id="chat-container">
+    <div id="chat-messages"></div>
+    <input type="text" id="chat-input" placeholder="Type your message to Santa 🎅..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <audio id="music" loop autoplay playsinline>
+    <source src="https://cdn.pixabay.com/download/audio/2022/12/15/audio_7b3a96e7f1.mp3" type="audio/mpeg" />
+  </audio>
+  <audio id="hoho" playsinline>
+    <source src="https://cdn.pixabay.com/download/audio/2021/12/22/audio_3e3b9b1c7d.mp3" type="audio/mpeg" />
+  </audio>
+
+  <script type="module">
+    import OpenAI from "https://cdn.jsdelivr.net/npm/openai/dist/openai.min.js";
+    window.openai = new OpenAI({
+      apiKey: "YOUR_OPENAI_API_KEY" // ⚠️ Replace with your OpenAI API key
+    });
+  </script>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Initialize map centered on the Philippines
-    const map = L.map('map').setView([12.8797, 121.7740], 6);
+    // Map and Santa movement
+    const map = L.map('map', { zoomControl: false }).setView([12.8797, 121.7740], 6);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
-    }).addTo(map);
-
-    // Santa icon
     const santaIcon = L.icon({
-      iconUrl: 'https://cdn-icons-png.flaticon.com/512/3468/3468377.png',
-      iconSize: [48, 48],
-      iconAnchor: [24, 24]
+      iconUrl: 'https://gallery.yopriceville.com/var/albums/Free-Clipart-Pictures/Christmas-PNG/Transparent_Santa_Claus-with_Sled.png?m=1629785341',
+      iconSize: [64, 64],
+      iconAnchor: [32, 32]
     });
 
-    // Sample route around the Philippines (for fun only)
-    const santaRoute = [
-      [14.5995, 120.9842], // Manila
-      [15.4828, 120.7120], // Pampanga
-      [16.4023, 120.5960], // Baguio
-      [13.7565, 121.0583], // Batangas
-      [10.3157, 123.8854], // Cebu
-      [9.7392, 118.7353],  // Palawan
-      [8.4542, 124.6319],  // Cagayan de Oro
-      [7.1907, 125.4553]   // Davao
-    ];
+    let santaMarker = L.marker([12.8797, 121.7740], { icon: santaIcon }).addTo(map).bindPopup('🎅 Santa is VERY close!');
+    let userLat = 12.8797, userLng = 121.7740;
+    let pathLine = L.polyline([[santaMarker.getLatLng().lat, santaMarker.getLatLng().lng], [userLat, userLng]], { color: 'yellow', dashArray: '5, 10' }).addTo(map);
 
-    let index = 0;
+    function moveSanta() {
+      let santaLat = santaMarker.getLatLng().lat + (Math.random() - 0.5) * 0.01;
+      let santaLng = santaMarker.getLatLng().lng + (Math.random() - 0.5) * 0.01;
+      santaMarker.setLatLng([santaLat, santaLng]);
+      pathLine.setLatLngs([[santaLat, santaLng], [userLat, userLng]]);
+      setTimeout(moveSanta, 6000);
+    }
+    moveSanta();
 
-    const santaMarker = L.marker(santaRoute[0], { icon: santaIcon })
-      .addTo(map)
-      .bindPopup('🎅 Santa is delivering gifts here!');
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+        pathLine.setLatLngs([[santaMarker.getLatLng().lat, santaMarker.getLatLng().lng], [userLat, userLng]]);
+      });
+    }
 
-    // Move Santa every 3 seconds
-    setInterval(() => {
-      index = (index + 1) % santaRoute.length;
-      santaMarker.setLatLng(santaRoute[index]);
-      santaMarker.openPopup();
-    }, 3000);
+    // ETA and score
+    function generateETA() { const now = new Date(); const future = new Date(now.getTime() + Math.random() * 4 * 60 * 60 * 1000); eta.innerText = future.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    let score = 0; function addPoints() { score += Math.floor(Math.random() * 6) + 1; if(score>20) showToast('🌟 Santa is SUPER proud of you!'); document.getElementById('score').innerText = `Score: ${score}`; }
 
-    function copyLink() {
-      navigator.clipboard.writeText(window.location.href);
-      alert('🎄 Link copied! Share it with everyone.');
+    const quotes = ['Mabait ka ngayong taon. Proud si Santa sayo!','Your kindness is the real gift 🎁','You made people smile this year 😊','Hindi lahat nakikita, pero ramdam ang kabutihan mo.'];
+    function newQuote() { quote.innerText = quotes[Math.floor(Math.random() * quotes.length)]; }
+
+    function updateCountdown() { const now = new Date(); const midnight = new Date(); midnight.setHours(24,0,0,0); const diff = midnight - now; const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); countdown.innerText = `${h}h ${m}m left`; }
+
+    const music = document.getElementById('music'); const ho = document.getElementById('hoho');
+    function tryAutoplay() { music.volume = 0.6; music.play().catch(()=>showToast('🔊 Tap Music to enable sound')); }
+    function toggleMusic() { music.paused ? music.play() : music.pause(); }
+    function hohoho() { ho.play(); }
+    function robuxPrank() { showToast('Pabili ka sa mama mo! 😂'); hohoho(); }
+    function showToast(msg) { const t=document.getElementById('toast'); t.innerText=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+    function copyLink() { navigator.clipboard.writeText(location.href); showToast('🎄 Link copied!'); }
+
+    function snow() { const s=document.createElement('div'); s.className='snowflake'; s.style.left=Math.random()*100+'vw'; s.style.animationDuration=4+Math.random()*5+'s'; s.innerText='❄'; document.body.appendChild(s); setTimeout(()=>s.remove(),9000); }
+    setInterval(snow,260);
+
+    generateETA(); newQuote(); updateCountdown(); setInterval(updateCountdown,60000); tryAutoplay();
+
+    // AI Santa Chat
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const chatMessages = document.getElementById('chat-messages');
+
+      const userDiv = document.createElement('div');
+      userDiv.innerHTML = `<strong>You:</strong> ${msg}`;
+      chatMessages.appendChild(userDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      const santaDiv = document.createElement('div');
+      santaDiv.innerHTML = `<strong>Santa:</strong> ...🎅`;
+      chatMessages.appendChild(santaDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      input.value = '';
+
+      try {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            { role: "system", content: "You are Santa Claus. Cheerful, kind, festive, and fun." },
+            { role: "user", content: msg }
+          ],
+          temperature: 0.8
+        });
+
+        santaDiv.innerHTML = `<strong>Santa:</strong> ${response.choices[0].message.content}`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      } catch (err) {
+        console.error(err);
+        santaDiv.innerHTML = `<strong>Santa:</strong> Ho Ho Ho! Something went wrong 😅`;
+      }
+    }
+  </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Santa Tracker PH – Viral Phone Edition 🎅📱</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: radial-gradient(circle at top, #0e2a47 0%, #061327 65%); color: #fff; overflow-x: hidden; }
+    header { padding: 8px 10px; text-align: center; background: linear-gradient(135deg, #b1121f, #6b0000); }
+    header h1 { margin: 0; font-size: 1.05rem; line-height: 1.2; }
+    header p { margin: 2px 0 0; font-size: 0.75rem; opacity: 0.95; }
+    #map { height: 50vh; width: 100%; }
+    .panel { padding: 10px; display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .card { background: rgba(255,255,255,0.09); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.3); backdrop-filter: blur(6px); }
+    .card h3 { margin: 0 0 6px; font-size: 0.9rem; }
+    button, .link-btn { padding: 10px 12px; border-radius: 12px; border: none; cursor: pointer; background: #198754; color: #fff; font-weight: 700; font-size: 0.8rem; width: 100%; }
+    .secondary { background: #0d6efd; } .warn { background: #ffc107; color: #000; } .danger { background: #dc3545; }
+    footer { padding: 8px; text-align: center; font-size: 0.7rem; background: #041022; }
+    .quote { font-style: italic; font-size: 0.8rem; }
+    .snowflake { position: fixed; top: -10px; color: white; font-size: 0.9em; animation: fall linear infinite; z-index: 9999; pointer-events: none; }
+    @keyframes fall { to { transform: translateY(110vh); } }
+    .toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #000; padding: 12px 16px; border-radius: 14px; box-shadow: 0 12px 24px rgba(0,0,0,0.45); display: none; z-index: 10000; font-size: 0.85rem; }
+    
+    /* Chatbox styles */
+    #chat-container {
+      position: fixed;
+      bottom: 0;
+      right: 10px;
+      width: 260px;
+      max-width: 90vw;
+      background: rgba(0,0,0,0.7);
+      padding: 8px;
+      border-radius: 12px 12px 0 0;
+      box-shadow: 0 0 12px rgba(0,0,0,0.5);
+      font-size: 0.85rem;
+      color: #fff;
+      z-index: 9999;
+    }
+    #chat-messages {
+      max-height: 180px;
+      overflow-y: auto;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #fff2;
+      padding-bottom: 4px;
+    }
+    #chat-messages div { margin: 4px 0; }
+    #chat-input { width: calc(100% - 50px); padding: 6px 8px; border-radius: 8px; border: none; }
+    #chat-container button { width: 40px; padding: 6px; border-radius: 8px; border: none; background: #198754; color: #fff; cursor: pointer; font-weight: bold; }
+
+    @media (min-width: 768px) { #map { height: 52vh; } .panel { grid-template-columns: repeat(4, 1fr); } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎅 Santa Tracker PH</h1>
+    <p id="subtitle">Malapit na si Santa! 🎁</p>
+    <p style="margin:2px 0 0;font-size:0.65rem;opacity:0.85;">by Kenichi</p>
+  </header>
+
+  <div id="map"></div>
+
+  <section class="panel">
+    <div class="card">
+      <h3>🎁 Gift ETA</h3>
+      <p id="eta">--:--</p>
+      <button onclick="generateETA()">Refresh ETA</button>
+    </div>
+
+    <div class="card">
+      <h3>🌟 Good Kid</h3>
+      <p id="score">Score: 0</p>
+      <button class="secondary" onclick="addPoints()">Good Deed</button>
+    </div>
+
+    <div class="card">
+      <h3>💬 Santa Says</h3>
+      <p id="quote" class="quote"></p>
+      <button class="warn" onclick="newQuote()">New Message</button>
+    </div>
+
+    <div class="card">
+      <h3>🎶 Sounds</h3>
+      <button onclick="toggleMusic()">Music On/Off</button>
+      <div style="height:6px"></div>
+      <button class="secondary" onclick="hohoho()">Ho Ho Ho!</button>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <h3>🎮 FREE ROBUX 😱</h3>
+      <button class="danger" onclick="robuxPrank()">👉 Click here to claim</button>
+    </div>
+
+    <div class="card" style="grid-column: span 2;">
+      <h3>⏳ Countdown</h3>
+      <p id="countdown"></p>
+    </div>
+  </section>
+
+  <footer>
+    Share the prank & the joy 🎄<br />
+    <button onclick="copyLink()">Copy Shareable Link</button>
+  </footer>
+
+  <div class="toast" id="toast">Pabili ka sa mama mo! 😂🎁</div>
+
+  <!-- Santa Chat Box -->
+  <div id="chat-container">
+    <div id="chat-messages"></div>
+    <input type="text" id="chat-input" placeholder="Type your message to Santa 🎅..." />
+    <button onclick="sendMessage()">Send</button>
+  </div>
+
+  <audio id="music" loop autoplay playsinline>
+    <source src="https://cdn.pixabay.com/download/audio/2022/12/15/audio_7b3a96e7f1.mp3" type="audio/mpeg" />
+  </audio>
+  <audio id="hoho" playsinline>
+    <source src="https://cdn.pixabay.com/download/audio/2021/12/22/audio_3e3b9b1c7d.mp3" type="audio/mpeg" />
+  </audio>
+
+  <script type="module">
+    import OpenAI from "https://cdn.jsdelivr.net/npm/openai/dist/openai.min.js";
+    window.openai = new OpenAI({
+      apiKey: "YOUR_OPENAI_API_KEY" // ⚠️ Replace with your OpenAI API key
+    });
+  </script>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Map and Santa movement
+    const map = L.map('map', { zoomControl: false }).setView([12.8797, 121.7740], 6);
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+
+    const santaIcon = L.icon({
+      iconUrl: 'https://gallery.yopriceville.com/var/albums/Free-Clipart-Pictures/Christmas-PNG/Transparent_Santa_Claus-with_Sled.png?m=1629785341',
+      iconSize: [64, 64],
+      iconAnchor: [32, 32]
+    });
+
+    let santaMarker = L.marker([12.8797, 121.7740], { icon: santaIcon }).addTo(map).bindPopup('🎅 Santa is VERY close!');
+    let userLat = 12.8797, userLng = 121.7740;
+    let pathLine = L.polyline([[santaMarker.getLatLng().lat, santaMarker.getLatLng().lng], [userLat, userLng]], { color: 'yellow', dashArray: '5, 10' }).addTo(map);
+
+    function moveSanta() {
+      let santaLat = santaMarker.getLatLng().lat + (Math.random() - 0.5) * 0.01;
+      let santaLng = santaMarker.getLatLng().lng + (Math.random() - 0.5) * 0.01;
+      santaMarker.setLatLng([santaLat, santaLng]);
+      pathLine.setLatLngs([[santaLat, santaLng], [userLat, userLng]]);
+      setTimeout(moveSanta, 6000);
+    }
+    moveSanta();
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+        pathLine.setLatLngs([[santaMarker.getLatLng().lat, santaMarker.getLatLng().lng], [userLat, userLng]]);
+      });
+    }
+
+    // ETA and score
+    function generateETA() { const now = new Date(); const future = new Date(now.getTime() + Math.random() * 4 * 60 * 60 * 1000); eta.innerText = future.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+    let score = 0; function addPoints() { score += Math.floor(Math.random() * 6) + 1; if(score>20) showToast('🌟 Santa is SUPER proud of you!'); document.getElementById('score').innerText = `Score: ${score}`; }
+
+    const quotes = ['Mabait ka ngayong taon. Proud si Santa sayo!','Your kindness is the real gift 🎁','You made people smile this year 😊','Hindi lahat nakikita, pero ramdam ang kabutihan mo.'];
+    function newQuote() { quote.innerText = quotes[Math.floor(Math.random() * quotes.length)]; }
+
+    function updateCountdown() { const now = new Date(); const midnight = new Date(); midnight.setHours(24,0,0,0); const diff = midnight - now; const h = Math.floor(diff / 3600000); const m = Math.floor((diff % 3600000) / 60000); countdown.innerText = `${h}h ${m}m left`; }
+
+    const music = document.getElementById('music'); const ho = document.getElementById('hoho');
+    function tryAutoplay() { music.volume = 0.6; music.play().catch(()=>showToast('🔊 Tap Music to enable sound')); }
+    function toggleMusic() { music.paused ? music.play() : music.pause(); }
+    function hohoho() { ho.play(); }
+    function robuxPrank() { showToast('Pabili ka sa mama mo! 😂'); hohoho(); }
+    function showToast(msg) { const t=document.getElementById('toast'); t.innerText=msg; t.style.display='block'; setTimeout(()=>t.style.display='none',3500); }
+    function copyLink() { navigator.clipboard.writeText(location.href); showToast('🎄 Link copied!'); }
+
+    function snow() { const s=document.createElement('div'); s.className='snowflake'; s.style.left=Math.random()*100+'vw'; s.style.animationDuration=4+Math.random()*5+'s'; s.innerText='❄'; document.body.appendChild(s); setTimeout(()=>s.remove(),9000); }
+    setInterval(snow,260);
+
+    generateETA(); newQuote(); updateCountdown(); setInterval(updateCountdown,60000); tryAutoplay();
+
+    // AI Santa Chat
+    async function sendMessage() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const chatMessages = document.getElementById('chat-messages');
+
+      const userDiv = document.createElement('div');
+      userDiv.innerHTML = `<strong>You:</strong> ${msg}`;
+      chatMessages.appendChild(userDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      const santaDiv = document.createElement('div');
+      santaDiv.innerHTML = `<strong>Santa:</strong> ...🎅`;
+      chatMessages.appendChild(santaDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      input.value = '';
+
+      try {
+        const response = await openai.chat.completions.create({
+          model: "gpt-4",
+          messages: [
+            { role: "system", content: "You are Santa Claus. Cheerful, kind, festive, and fun." },
+            { role: "user", content: msg }
+          ],
+          temperature: 0.8
+        });
+
+        santaDiv.innerHTML = `<strong>Santa:</strong> ${response.choices[0].message.content}`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      } catch (err) {
+        console.error(err);
+        santaDiv.innerHTML = `<strong>Santa:</strong> Ho Ho Ho! Something went wrong 😅`;
+      }
     }
   </script>
 </body>
